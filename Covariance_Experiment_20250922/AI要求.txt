@@ -1,0 +1,337 @@
+clear; close all; clc;
+
+sigma = 1;
+
+% 模式选择：'r' 表示相关系数变化，'N' 表示样本量变化
+mode = 'N_changing';   % 可改成 'N'
+
+% ---------- 根据模式选择输出文件 ----------
+switch mode
+    case 'r_changing'
+        diary('Matrixs_r.txt');   % 开始记录命令行输出
+    case 'N_changing'
+        diary('Matrixs_N.txt');
+end
+
+switch mode
+    case 'r_changing'   % ---------- 相关系数变化 ----------
+        N = 500;
+        r_values = -1:0.05:1;   % 要考察的相关系数
+        num_cases = length(r_values);
+        num_rows = ceil(sqrt(num_cases));
+        num_cols = ceil(num_cases/num_rows);
+
+        for k = 1:num_cases
+            r = r_values(k);
+            subplot(num_rows, num_cols, k);
+            GenerateDataAndPlot(N, sigma, r);
+        end
+
+        PlotCorrelationAndCovariance(N, sigma, r_values);
+
+    case 'N_changing'   % ---------- 样本量变化 ----------
+        N_values = 100:100:1000;   % 要考察的样本量
+        r = 0.5;                   % 固定相关系数
+        num_cases = length(N_values);
+        num_rows = ceil(sqrt(num_cases));
+        num_cols = ceil(num_cases/num_rows);
+
+        for k = 1:num_cases
+            N = N_values(k);
+            subplot(num_rows, num_cols, k);
+            GenerateDataAndPlot(N, sigma, r);
+        end
+
+        PlotCorrelationAndCovariance(N_values, sigma, r);
+end
+
+% ---------- 停止记录 ----------
+diary off;
+
+function GenerateDataAndPlot(N, sigma, r)
+    fprintf("-----------------------------------\nr = %f\n\n", r);
+
+    % 生成数据
+    % u1 = randn(1, N);
+    % u2 = randn(1, N);
+    % 这里搞错了，u1,u2应该是N行的列向量。若误把 1×N 行向量直接拼成 [X; Y]（2×N），并且传给 cov([X;Y]) 或 corrcoef([X;Y])，MATLAB会把 N 列当成 N 个变量、但只有 2 个观测，这会得到非常奇怪的结果。
+    % u1 = randn(N,1);
+    % u2 = randn(N,1);
+    % % X = u1;
+    % % X = normrnd(1, 2, [1, N]);   % 均值=1，标准差=2，生成 1×N 向量
+    % X = 1 + 2 * u1;
+    % Y = sigma*r.*u1 + sigma*sqrt(1-r^2).*u2;
+    [X, Y] = GenerateRandomVariables(N, sigma, r);
+
+r
+    % 作图
+    scatter(X, Y);
+    axis([-4 4 -4 4]);
+    title(sprintf("N = %d ,r = %.2f", N,r));
+
+    % 显示协方差和相关系数
+    ShowCovAndCorr(X, Y);
+end
+
+function [X, Y] = GenerateRandomVariables(N, sigma, r)
+    % GenerateData 生成二维相关数据
+    %
+    % 输入参数:
+    %   N     - 样本数量
+    %   sigma - 标准差缩放因子
+    %   r     - 相关系数 (-1 <= r <= 1)
+    %
+    % 输出参数:
+    %   X, Y  - 生成的数据向量
+
+    % 随机数
+    u1 = randn(N,1);
+    u2 = randn(N,1);
+
+    % X ~ N(1, 2^2)
+    % X = 1 + 2 * u1;
+    X = u1;
+
+    % Y 与 X 存在相关性
+    Y = sigma * r .* u1 + sigma * sqrt(1 - r^2) .* u2;
+    % Y = X.^2;
+end
+
+
+function C = MyCov(X, Y)
+% myCov 计算两个随机变量的协方差矩阵
+% 输入:
+%   X, Y - 两个等长的随机变量向量
+% 输出:
+%   C - 2x2 协方差矩阵
+
+    if length(X) ~= length(Y)
+        error('X 和 Y 的长度必须相同');
+    end
+    
+    % 转换为矩阵形式
+    data = [X(:), Y(:)];
+    
+    % 使用公式计算协方差矩阵
+    n = size(data,1);
+    mu = mean(data,1);
+    C = (data - mu)' * (data - mu) / (n-1);
+end
+
+
+function R = MyCorrCoef(X, Y)
+% myCorr 计算两个随机变量的相关系数矩阵
+% 输入:
+%   X, Y - 两个等长的随机变量向量
+% 输出:
+%   R - 2x2 相关系数矩阵
+
+    C = MyCov(X, Y);   % 先调用协方差矩阵
+    d = sqrt(diag(C)); % 标准差向量
+    R = C ./ (d * d'); % 相关系数矩阵
+end
+
+function ShowCovAndCorr(X, Y)
+    % Matlab自带函数
+    C1 = cov(X, Y);
+    disp('Matlab自带函数计算的协方差矩阵:');
+    disp(C1);
+
+    % 自写协方差函数
+    C2 = MyCov(X, Y);
+    disp('自写子函数计算的协方差矩阵:');
+    disp(C2);
+    
+    % Matlab自带函数
+    R1 = corrcoef(X, Y);
+    disp('Matlab自带函数计算的相关系数矩阵:');
+    disp(R1);
+
+    % 自写相关系数函数
+    R2 = MyCorrCoef(X, Y);
+    disp('自写子函数计算的相关系数矩阵:');
+    disp(R2);
+end
+
+function PlotCorrelationAndCovariance(N, sigma, r_values)
+    % 判断是 N 变化还是 r 变化
+    if numel(r_values) > 1 && numel(N) == 1
+        variable = 'r';
+        values = r_values;
+    elseif numel(N) > 1 && numel(r_values) == 1
+        variable = 'N';
+        values = N;
+    else
+        error('N 和 r_values 不能同时是数组，只能有一个是数组');
+    end
+
+    % 结果存储
+    Cov_all = zeros(2,2,length(values));
+    Corr_all = zeros(2,2,length(values));
+
+    for k = 1:length(values)
+        if variable == "r"
+            [X, Y] = GenerateRandomVariables(N, sigma, values(k));
+        else
+            [X, Y] = GenerateRandomVariables(values(k), sigma, r_values);
+        end
+
+        Cov_all(:,:,k) = MyCov(X, Y);
+        Corr_all(:,:,k) = MyCorrCoef(X, Y);
+
+        % 检查相关系数
+        if any(abs(Corr_all(:,:,k)) > 1+1e-10, 'all')
+            warning('相关系数超出范围: %f', max(abs(Corr_all(:,:,k)),[],'all'));
+        end
+    end
+
+    % 转换为热力图数据: 每个矩阵元素随变量变化
+    figure;
+    colormap("jet"); 
+    for i = 1:2
+        for j = 1:2
+            subplot(2,2,(i-1)*2+j);
+            imagesc(values, 1, squeeze(Cov_all(i,j,:))');
+            colorbar;
+            xlabel(variable);
+            ylabel(sprintf('Cov(%d,%d)', i,j));
+            title(sprintf('协方差矩阵元素 C(%d,%d) 随 %s 变化', i,j,variable));
+        end
+    end
+
+    figure;
+    colormap("jet"); 
+    for i = 1:2
+        for j = 1:2
+            subplot(2,2,(i-1)*2+j);
+            imagesc(values, 1, squeeze(Corr_all(i,j,:))');
+            colorbar;
+            xlabel(variable);
+            ylabel(sprintf('Corr(%d,%d)', i,j));
+            title(sprintf('相关系数矩阵元素 R(%d,%d) 随 %s 变化', i,j,variable));
+            caxis([-1 1]); % 相关系数范围限制
+        end
+    end
+
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+    % 绘制 Cov_all
+    figure;
+    for i = 1:2
+        for j = 1:2
+            subplot(2,2,(i-1)*2+j);
+            plot(values, squeeze(Cov_all(i,j,:)), 'LineWidth', 1.5);
+            xlabel(variable);
+            ylabel(sprintf('Cov(%d,%d)', i, j));
+            grid on;
+        end
+    end
+    sgtitle('Covariance Matrix Elements');
+    
+    % 绘制 Corr_all
+    figure;
+    for i = 1:2
+        for j = 1:2
+            subplot(2,2,(i-1)*2+j);
+            plot(values, squeeze(Corr_all(i,j,:)), 'LineWidth', 1.5);
+            xlabel(variable);
+            ylabel(sprintf('Corr(%d,%d)', i, j));
+            grid on;
+        end
+    end
+    sgtitle('Correlation Matrix Elements');
+
+
+
+
+
+
+
+end   % PlotCorrelationAndCovariance
+
+
+
+
+分析代码整体结构，并生成整体架构图，逻辑清晰严谨细致
+
+
+
+
+
+
+
+
+
+
+/////////////////////////////////////////////////////////////////////////
+
+clear; close all; clc;
+sigma = 1;
+
+% 模式选择：'r' 表示相关系数变化，'N' 表示样本量变化
+mode = 'r_changing'; % 可改成 'r_changing'
+
+% ---------- 根据模式选择输出文件 ----------
+switch mode
+    case 'r_changing'
+        filename = 'Matrixs_r.txt';
+    case 'N_changing'
+        filename = 'Matrixs_N.txt';
+end
+
+% 如果文件存在，先清空；如果不存在，会新建
+fid = fopen(filename, 'w');
+fclose(fid);
+
+% 开始记录命令行输出
+diary(filename);
+
+switch mode
+    case 'r_changing'
+        % ---------- 相关系数变化 ----------
+        N = 500;
+        r_values = -1:0.05:1; % 要考察的相关系数
+        num_cases = length(r_values);
+        num_rows = ceil(sqrt(num_cases));
+        num_cols = ceil(num_cases/num_rows);
+
+        for k = 1:num_cases
+            r = r_values(k);
+            subplot(num_rows, num_cols, k);
+            GenerateDataAndPlot(N, sigma, r);
+        end
+        PlotCorrelationAndCovariance(N, sigma, r_values);
+
+    case 'N_changing'
+        % ---------- 样本量变化 ----------
+        N_values = 100:50:1000; % 要考察的样本量
+        r = 0.5; % 固定相关系数
+        num_cases = length(N_values);
+        num_rows = ceil(sqrt(num_cases));
+        num_cols = ceil(num_cases/num_rows);
+
+        for k = 1:num_cases
+            N = N_values(k);
+            subplot(num_rows, num_cols, k);
+            GenerateDataAndPlot(N, sigma, r);
+        end
+        PlotCorrelationAndCovariance(N_values, sigma, r);
+end
+
+% ---------- 停止记录 ----------
+diary off;
+
+
+
+这是随着r的变化，协方差矩阵和相关系数矩阵的变化，根据我附件给你的命令行输出数据分析它们分别有什么规律，并给出数学上的原理解释。其中X,Y满足
+
+    u1 = randn(1,N);
+    u2 = randn(1,N);
+
+    X = u1;
+    Y = X.^2;
+
+
+

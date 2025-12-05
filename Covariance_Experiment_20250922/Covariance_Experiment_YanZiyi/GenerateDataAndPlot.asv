@@ -1,0 +1,49 @@
+function GenerateDataAndPlot(N, sigma, r)
+    fprintf("-----------------------------------\nr = %f\n\n", r);
+
+    % 生成数据
+    % u1 = randn(1, N);
+    % u2 = randn(1, N);
+    % 这里搞错了，u1,u2应该是N行的列向量。若误把 1×N 行向量直接拼成 [X; Y]（2×N），并且传给 cov([X;Y]) 或 corrcoef([X;Y])，MATLAB会把 N 列当成 N 个变量、但只有 2 个观测，这会得到非常奇怪的结果。
+    u1 = randn(N,1);
+    u2 = randn(N,1);
+    % X = u1;
+    % X = normrnd(1, 2, [1, N]);   % 均值=1，标准差=2，生成 1×N 向量
+    X = 1 + 2 * u1;
+    Y = sigma*r.*u1 + sigma*sqrt(1-r^2).*u2;
+
+    % 作图
+    scatter(X, Y);
+    axis([-4 4 -4 4]);
+    title(sprintf("N = %d ,r = %.2f", N,r));
+
+    % 显示协方差和相关系数
+    ShowCovAndCorr(X, Y);
+end
+
+% function GenerateDataAndPlot(N, sigma, r, d)
+%     fprintf("-----------------------------------\nr = %f, d = %d\n\n", r, d);
+% 
+%     % 构造等相关矩阵
+%     Sigma = (1-r)*eye(d) + r*ones(d);
+% 
+%     % 生成 d 维随机向量
+%     X = mvnrnd(zeros(1,d), sigma^2*Sigma, N);
+% 
+%     % 可视化
+%     if d == 2
+%         scatter(X(:,1), X(:,2));
+%         axis([-4 4 -4 4]);
+%     else
+%         plotmatrix(X);   % 多维时画散点矩阵
+%     end
+%     title(sprintf("r = %.2f, d = %d", r, d));
+% 
+%     % 显示协方差和相关系数矩阵
+%     C = cov(X);
+%     R = corrcoef(X);
+%     disp('Covariance matrix:');
+%     disp(C);
+%     disp('Correlation matrix:');
+%     disp(R);
+% end
